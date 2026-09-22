@@ -70,11 +70,14 @@ Update-SshToolkit          # apply if an update is available
 Update-SshToolkit -Force   # re-apply even if already up to date
 ```
 
-`Update-SshToolkit` detects how it was installed and does the right thing: `git pull`
-(or `git submodule update --remote` from the parent project) for a git checkout, or
-downloading and extracting the latest release archive in place for a plain copy.
-Either way, it only ever touches the toolkit's **own** files — your `~/.ssh-toolkit`
-registry and `~/.ssh/config` are never touched by an update.
+`Update-SshToolkit` detects how it was installed and does the right thing: for a git
+checkout (a plain clone, or a submodule of a host project — which normally sits at a
+detached `HEAD` with no tracking branch, where a plain `git pull` fails outright) it
+fetches and checks out the exact latest **release tag**, so "updated" always means
+"now at the version `Test-SshToolkitUpdate` reported". For a plain downloaded copy (no
+`.git` at all) it downloads and extracts the latest release archive in place. Either
+way, it only ever touches the toolkit's **own** files — your `~/.ssh-toolkit` registry
+and `~/.ssh/config` are never touched by an update.
 
 A host project that wants **automatic** update checks (e.g. "check weekly, notify but
 don't apply" or "check and auto-apply") should call `Test-SshToolkitUpdate`/

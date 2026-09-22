@@ -4,6 +4,15 @@ All notable changes to SSH Toolkit are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.3] — 2026-09-22
+
+### Fixed
+- `Update-SshToolkit`'s git path used `git pull`, which **fails outright** on a git
+  submodule checkout — a submodule normally sits at a detached `HEAD` with no tracking
+  branch (confirmed live, wiring up a real host project). Now fetches tags and checks
+  out the exact latest release tag instead, which works for both a plain clone and a
+  submodule, and matches exactly what `Test-SshToolkitUpdate` compared against.
+
 ## [1.0.2] — 2026-09-22
 
 ### Fixed

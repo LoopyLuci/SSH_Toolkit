@@ -555,12 +555,16 @@ function Update-SshToolkit {
     <#
     .SYNOPSIS
         Applies an available update in place. If the module's own folder is a git
-        checkout (a plain clone, or a git submodule of a host project), runs `git pull`
-        (or `git submodule update --remote` when it detects it's a submodule) - the
-        normal way a host project would track this toolkit. Otherwise (a plain
-        downloaded copy) downloads and extracts the latest release archive over the
-        current files, leaving your ~/.ssh-toolkit registry and ~/.ssh/config untouched
-        either way (this only ever replaces the toolkit's OWN files).
+        checkout, fetches and checks out the exact latest RELEASE tag (not just
+        whatever the latest commit on a branch happens to be - the same thing
+        Test-SshToolkitUpdate compared against, so "updated" always means "now at the
+        version that check reported"). This works whether the checkout is a plain clone
+        on a branch or a git submodule of a host project - a submodule normally sits at
+        a detached HEAD with no tracking branch, where a plain `git pull` fails outright
+        (confirmed live), so this never assumes one exists. Otherwise (a plain
+        downloaded copy, no .git at all) downloads and extracts the latest release
+        archive over the current files. Either way, only ever replaces the toolkit's
+        OWN files - your ~/.ssh-toolkit registry and ~/.ssh/config are untouched.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param([string]$Repo = 'LoopyLuci/SSH_Toolkit', [switch]$Force)
@@ -579,8 +583,10 @@ function Update-SshToolkit {
         try {
             & git rev-parse --is-inside-work-tree *> $null
             if ($LASTEXITCODE -ne 0) { throw 'not a git working tree' }
-            & git pull --ff-only 2>&1 | Out-String | Write-Verbose
-            if ($LASTEXITCODE -ne 0) { throw "git pull failed (exit $LASTEXITCODE) - resolve manually" }
+            & git fetch --tags --force origin 2>&1 | Out-String | Write-Verbose
+            if ($LASTEXITCODE -ne 0) { throw "git fetch failed (exit $LASTEXITCODE) - resolve manually" }
+            & git checkout "v$($check.LatestVersion)" 2>&1 | Out-String | Write-Verbose
+            if ($LASTEXITCODE -ne 0) { throw "git checkout v$($check.LatestVersion) failed (exit $LASTEXITCODE) - resolve manually" }
         }
         finally { Pop-Location }
     }
