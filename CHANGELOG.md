@@ -4,6 +4,14 @@ All notable changes to SSH Toolkit are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.4] — 2026-09-22
+
+### Changed
+- No functional change — a version bump used to live-verify v1.0.3's
+  `Update-SshToolkit` submodule fix actually works end to end (updating a real host
+  project's pinned submodule checkout from v1.0.3 to this release), not just that the
+  bug it fixed reproduces on older versions.
+
 ## [1.0.3] — 2026-09-22
 
 ### Fixed
