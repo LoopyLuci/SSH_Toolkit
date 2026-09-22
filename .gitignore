@@ -1,0 +1,13 @@
+# Local registry/state - never ship someone's own connections or keys
+.ssh-toolkit/
+*.pem
+*.key
+id_ed25519*
+id_rsa*
+
+# Editor/OS cruft
+.vs/
+.vscode/
+*.user
+Thumbs.db
+.DS_Store
