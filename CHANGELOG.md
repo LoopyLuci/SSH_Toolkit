@@ -4,6 +4,12 @@ All notable changes to SSH Toolkit are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] — 2026-09-22
+
+### Fixed
+- `Test-SshToolkitUpdate`'s `InstalledVersion`/`LatestVersion` now serialize to JSON as
+  plain "1.0.2"-style strings, not a `[version]` object's raw Major/Minor/Build struct.
+
 ## [1.0.1] — 2026-09-22
 
 ### Added

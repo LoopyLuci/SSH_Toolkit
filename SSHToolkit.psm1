@@ -533,8 +533,11 @@ function Test-SshToolkitUpdate {
         $latestTag = $release.tag_name.TrimStart('v')
         $latest = [version]$latestTag
         return [pscustomobject]@{
-            InstalledVersion = $installed
-            LatestVersion    = $latest
+            # .ToString() on both - a bare [version] serializes to JSON as its
+            # Major/Minor/Build/Revision struct, not the plain "1.0.1" string every
+            # consumer (including this same function's own error-path below) expects.
+            InstalledVersion = $installed.ToString()
+            LatestVersion    = $latest.ToString()
             UpdateAvailable  = ($latest -gt $installed)
             ReleaseUrl       = $release.html_url
             Error            = $null
@@ -542,7 +545,7 @@ function Test-SshToolkitUpdate {
     }
     catch {
         return [pscustomobject]@{
-            InstalledVersion = $installed; LatestVersion = $null; UpdateAvailable = $false
+            InstalledVersion = $installed.ToString(); LatestVersion = $null; UpdateAvailable = $false
             ReleaseUrl = $null; Error = $_.Exception.Message
         }
     }
