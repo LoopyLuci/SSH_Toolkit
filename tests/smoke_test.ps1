@@ -48,6 +48,9 @@ $cli = Join-Path $root 'bin\ssh-toolkit.ps1'
 $listJson = & $cli -Action List -Json | ConvertFrom-Json
 Assert (@($listJson).Count -eq 2) 'CLI List -Json sees both connections'
 
+$graphJson = & $cli -Action Visualize -Json | ConvertFrom-Json
+Assert (@($graphJson).Count -eq 2) 'CLI Visualize -Json returns structured graph data'
+
 & $cli -Action Remove -Name boxA -Force
 & $cli -Action Remove -Name boxB -Force
 Assert ((Get-SshLinkConnections).Count -eq 0) 'CLI Remove works for both'

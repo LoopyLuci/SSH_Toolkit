@@ -4,6 +4,13 @@ All notable changes to SSH Toolkit are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] — 2026-09-22
+
+### Added
+- `bin/ssh-toolkit.ps1 -Action Visualize -Json` — the proxy-jump graph as structured
+  JSON (`Get-SshLinkGraph`'s own data), for a program embedding this toolkit to render
+  its own visualization instead of parsing the ASCII tree.
+
 ## [1.0.0] — 2026-09-22
 
 ### Added

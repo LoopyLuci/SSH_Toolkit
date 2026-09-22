@@ -311,7 +311,9 @@ switch ($Action) {
         if (-not $ok) { exit 1 }
     }
     'TestAll' { Show-SshLinkStatusAllTable -Json:$Json }
-    'Visualize' { Show-SshLinkGraphTree }
+    'Visualize' {
+        if ($Json) { ConvertTo-Json -InputObject @(Get-SshLinkGraph) -Depth 6 } else { Show-SshLinkGraphTree }
+    }
     'InstallKey' {
         if (-not $Name) { throw '-Action InstallKey needs -Name.' }
         $ok = Install-SshLinkPublicKey -Name $Name
