@@ -4,6 +4,27 @@ All notable changes to SSH Toolkit are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.5] — 2026-09-22
+
+### Fixed
+- `bin/ssh-toolkit.ps1 -Action Connect` now propagates the remote command's real exit
+  code (`exit $LASTEXITCODE`) — until now a failed remote command, or a connection that
+  failed outright, still left the wrapping script's own exit code at 0, so a caller
+  checking "did this succeed" by exit code (a script, or another program's own
+  wrapper) got a false success.
+- Every `ssh`/`scp` call this module makes now passes `-F <its own config file>`
+  explicitly, instead of relying on `ssh`/`scp`'s own default `~/.ssh/config`
+  resolution. On Windows, Win32-OpenSSH resolves the user's home directory through the
+  real Windows user profile, **not** the `$env:USERPROFILE`/`$env:HOME` environment
+  variables (confirmed live) — so anything that had reason to run this module with a
+  non-default `$HOME` (automated tests, most notably) would silently read/write the
+  wrong config file. Real end users on an ordinary single-user machine were never
+  affected by this (their `$HOME` already matches their real profile) but the fix
+  makes behavior deterministic regardless.
+- `Install-SshLinkPublicKey` now connects through the registered alias (honoring
+  `ProxyJump` and everything else already in the connection's config entry)
+  instead of reconstructing a raw `user@host -p port` target by hand.
+
 ## [1.0.4] — 2026-09-22
 
 ### Changed

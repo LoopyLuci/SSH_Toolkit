@@ -333,7 +333,15 @@ function Connect-SshLink {
     param([Parameter(Mandatory)][string]$Name, [string]$Command)
     $conn = Get-SshLinkConnection -Name $Name
     if (-not $conn) { throw "No connection named '$Name'. Run Get-SshLinkConnections to see what's registered." }
-    if ($Command) { & ssh $Name $Command } else { & ssh $Name }
+    # Local override, not the caller's own setting: under $ErrorActionPreference =
+    # 'Stop' (set by bin/ssh-toolkit.ps1, and possibly by whatever host program
+    # embeds this module), a native command's stderr output becomes a TERMINATING
+    # error - a normal "connection refused" or a remote command's own stderr text
+    # would crash this function outright instead of the exit code (below/via
+    # $LASTEXITCODE) being able to reflect it normally (confirmed live). Scoped to
+    # this function only; the caller's own preference is restored on return.
+    $ErrorActionPreference = 'Continue'
+    if ($Command) { & ssh -F $script:SshConfig $Name $Command } else { & ssh -F $script:SshConfig $Name }
 }
 
 function Test-SshLinkConnection {
@@ -347,7 +355,7 @@ function Test-SshLinkConnection {
     param([Parameter(Mandatory)][string]$Name, [int]$TimeoutSeconds = 8)
     $conn = Get-SshLinkConnection -Name $Name
     if (-not $conn) { throw "No connection named '$Name'." }
-    $output = & ssh -o BatchMode=yes -o ConnectTimeout=$TimeoutSeconds $Name 'echo SSH_TOOLKIT_OK' 2>&1
+    $output = & ssh -F $script:SshConfig -o BatchMode=yes -o ConnectTimeout=$TimeoutSeconds $Name 'echo SSH_TOOLKIT_OK' 2>&1
     return ($LASTEXITCODE -eq 0) -and ($output -match 'SSH_TOOLKIT_OK')
 }
 
@@ -367,8 +375,14 @@ function Install-SshLinkPublicKey {
     if (-not (Test-Path $pub)) { throw "Public key not found at $pub." }
     $keyText = (Get-Content -Path $pub -Raw).Trim()
     $remoteCmd = "umask 077; mkdir -p ~/.ssh; touch ~/.ssh/authorized_keys; grep -qxF '$keyText' ~/.ssh/authorized_keys || echo '$keyText' >> ~/.ssh/authorized_keys; echo INSTALLED"
-    $target = if ($conn.User) { "$($conn.User)@$($conn.HostName)" } else { $conn.HostName }
-    & ssh -p $conn.Port $target $remoteCmd
+    # See Connect-SshLink's comment on why this is scoped locally: a native command's
+    # stderr must never become a terminating error here, regardless of the caller's
+    # own $ErrorActionPreference.
+    $ErrorActionPreference = 'Continue'
+    # Through the registered alias (-F this config, $Name), not a hand-reconstructed
+    # raw host/port - that way ProxyJump and everything else already in the config
+    # entry is honored automatically instead of needing to be duplicated here.
+    & ssh -F $script:SshConfig $Name $remoteCmd
     return $LASTEXITCODE -eq 0
 }
 
@@ -381,7 +395,7 @@ function Get-SshLinkStatus {
     [CmdletBinding()]
     param([Parameter(Mandatory)]$Connection, [int]$TimeoutSeconds = 5)
     try {
-        $null = & ssh -o BatchMode=yes -o ConnectTimeout=$TimeoutSeconds $Connection.Name 'exit 0' 2>&1
+        $null = & ssh -F $script:SshConfig -o BatchMode=yes -o ConnectTimeout=$TimeoutSeconds $Connection.Name 'exit 0' 2>&1
         return [pscustomobject]@{ Name = $Connection.Name; Reachable = ($LASTEXITCODE -eq 0); ExitCode = $LASTEXITCODE }
     }
     catch {
@@ -491,8 +505,10 @@ function Copy-SshLinkFile {
     )
     $conn = Get-SshLinkConnection -Name $Name
     if (-not $conn) { throw "No connection named '$Name'." }
+    # See Connect-SshLink's comment on why this is scoped locally.
+    $ErrorActionPreference = 'Continue'
     $remoteSpec = "${Name}:$RemotePath"
-    if ($ToRemote) { & scp -r $LocalPath $remoteSpec } else { & scp -r $remoteSpec $LocalPath }
+    if ($ToRemote) { & scp -F $script:SshConfig -r $LocalPath $remoteSpec } else { & scp -F $script:SshConfig -r $remoteSpec $LocalPath }
     if ($LASTEXITCODE -ne 0) { throw "scp failed (exit $LASTEXITCODE)." }
 }
 

@@ -303,6 +303,13 @@ switch ($Action) {
     'Connect' {
         if (-not $Name) { throw '-Action Connect needs -Name.' }
         Connect-SshLink -Name $Name -Command $Command
+        # Without this, a failed remote command (or a failed connection entirely) still
+        # leaves this SCRIPT's own exit code at 0, since a failing external command
+        # doesn't automatically propagate through a PowerShell script's exit code -
+        # only ssh's own $LASTEXITCODE reflects it. A caller checking "did this
+        # succeed" by exit code (any script, or bot/ssh_toolkit.py's Python wrapper in
+        # AgenticBotPlatform) needs this to be real.
+        exit $LASTEXITCODE
     }
     'Test' {
         if (-not $Name) { throw '-Action Test needs -Name.' }

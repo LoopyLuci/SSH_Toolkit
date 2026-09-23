@@ -8,7 +8,16 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $testHome = Join-Path $env:TEMP "sshtoolkit-smoketest-$(Get-Random)"
 New-Item -ItemType Directory -Path $testHome -Force | Out-Null
+# Both matter, for different reasons: PowerShell's own $HOME automatic variable is what
+# this module's functions build paths from, but it is NOT the same thing as the real
+# OS environment variable - a native child process (ssh.exe/scp.exe, invoked by
+# Connect-SshLink etc.) resolves ~/.ssh/config from $env:USERPROFILE/$env:HOME
+# directly, ignoring PowerShell's own variable entirely (confirmed live: without also
+# setting these, a real ssh call in this test silently fell through to the REAL
+# ~/.ssh/config instead of the throwaway one just written).
 Set-Variable -Name HOME -Value $testHome -Scope Global -Force
+$env:HOME = $testHome
+$env:USERPROFILE = $testHome
 
 $failures = 0
 function Assert {
@@ -54,6 +63,12 @@ Assert (@($graphJson).Count -eq 2) 'CLI Visualize -Json returns structured graph
 & $cli -Action Remove -Name boxA -Force
 & $cli -Action Remove -Name boxB -Force
 Assert ((Get-SshLinkConnections).Count -eq 0) 'CLI Remove works for both'
+
+Write-Host "=== -Action Connect propagates a failed remote command's real exit code ===" -ForegroundColor Cyan
+& $cli -Action Add -Name cli-test-connect -HostName 127.0.0.1 -Port 1 -IdentityFile "$testHome\.ssh\fake" | Out-Null
+& $cli -Action Connect -Name cli-test-connect -Command "echo hi" *> $null
+Assert ($LASTEXITCODE -ne 0) '-Action Connect exits non-zero when the underlying ssh call fails'
+& $cli -Action Remove -Name cli-test-connect -Force | Out-Null
 
 Write-Host "=== Update check (network-dependent, non-fatal if it fails) ===" -ForegroundColor Cyan
 try {
