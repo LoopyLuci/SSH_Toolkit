@@ -440,7 +440,19 @@ function Install-SshLinkTrustedKey {
     }
 
     $isWindows = $env:OS -eq 'Windows_NT'
-    $isAdmin = $isWindows -and ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    # Deliberately NOT IsInRole(Administrator) - that reflects the CURRENT
+    # PROCESS's token, which is non-elevated (UAC split-token) for a background
+    # service running as an administrator account just as often as not (this is
+    # exactly the account AgenticBotPlatform itself typically runs as). What
+    # actually determines which file Windows sshd reads for that account's own
+    # login is group MEMBERSHIP, not this call's own elevation - a call running
+    # unelevated as an administrator account must still target
+    # administrators_authorized_keys, or the key silently never gets used.
+    $isAdmin = $isWindows -and (
+        @(Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -eq "$env:COMPUTERNAME\$env:USERNAME" -or $_.Name -eq $env:USERNAME }
+        ).Count -gt 0
+    )
     if ($isWindows -and $isAdmin) {
         # Windows OpenSSH server: an administrator's own key must live here, not
         # ~/.ssh/authorized_keys, or sshd silently ignores it.

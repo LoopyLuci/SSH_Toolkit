@@ -78,11 +78,35 @@ $kp2 = New-SshLinkKeypair -Name pairtest
 Assert (-not $kp2.Created) 'New-SshLinkKeypair reuses an existing key instead of overwriting it'
 Assert ($kp2.PublicKey -eq $kp.PublicKey) 'the reused key is the same key'
 
-$install = Install-SshLinkTrustedKey -PublicKey $kp.PublicKey
-Assert (-not $install.AlreadyPresent) 'Install-SshLinkTrustedKey installs a new key'
-Assert ((Get-Content $install.KeyFile -Raw) -match [regex]::Escape($kp.PublicKey)) 'the key text is really in the file'
-$install2 = Install-SshLinkTrustedKey -PublicKey $kp.PublicKey
-Assert ($install2.AlreadyPresent) 'Install-SshLinkTrustedKey is idempotent — installing twice is a no-op'
+# Install-SshLinkTrustedKey targets administrators_authorized_keys for an
+# ADMINISTRATOR ACCOUNT specifically (matching what Windows sshd itself reads
+# for that account), regardless of whether THIS process is elevated - and
+# writing there genuinely requires an elevated process, a real OS constraint,
+# not a bug. Running this suite as an admin account without elevation is
+# therefore an expected, real scenario (exactly the one a non-elevated
+# AgenticBotPlatform background process hits) - assert the SPECIFIC access
+# error it must fail with, rather than either silently accepting a wrong
+# result or hard-failing the suite over an environment difference.
+$isAdminAccount = $env:OS -eq 'Windows_NT' -and (@(
+    Get-LocalGroupMember -Group 'Administrators' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -eq "$env:COMPUTERNAME\$env:USERNAME" -or $_.Name -eq $env:USERNAME }
+).Count -gt 0)
+$isElevated = $env:OS -eq 'Windows_NT' -and ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if ($isAdminAccount -and -not $isElevated) {
+    try {
+        Install-SshLinkTrustedKey -PublicKey $kp.PublicKey
+        Assert $false 'Install-SshLinkTrustedKey should need elevation to write administrators_authorized_keys for an admin account'
+    }
+    catch { Assert ($_.Exception.Message -match 'denied|access') 'Install-SshLinkTrustedKey fails clearly (not silently) without elevation for an admin account' }
+}
+else {
+    $install = Install-SshLinkTrustedKey -PublicKey $kp.PublicKey
+    Assert (-not $install.AlreadyPresent) 'Install-SshLinkTrustedKey installs a new key'
+    Assert ((Get-Content $install.KeyFile -Raw) -match [regex]::Escape($kp.PublicKey)) 'the key text is really in the file'
+    $install2 = Install-SshLinkTrustedKey -PublicKey $kp.PublicKey
+    Assert ($install2.AlreadyPresent) 'Install-SshLinkTrustedKey is idempotent — installing twice is a no-op'
+}
 try {
     Install-SshLinkTrustedKey -PublicKey 'not a real key'
     Assert $false 'Install-SshLinkTrustedKey should reject text that is not an OpenSSH public key'
@@ -91,8 +115,10 @@ catch { Assert $true 'Install-SshLinkTrustedKey rejects malformed key text' }
 
 $cliKp = & $cli -Action GenerateKeypair -Name pairtest-cli -Json | ConvertFrom-Json
 Assert ($cliKp.Created) 'CLI GenerateKeypair works'
-$cliInstall = & $cli -Action InstallTrustedKey -PublicKey $cliKp.PublicKey -Json | ConvertFrom-Json
-Assert (-not $cliInstall.AlreadyPresent) 'CLI InstallTrustedKey works'
+if (-not ($isAdminAccount -and -not $isElevated)) {
+    $cliInstall = & $cli -Action InstallTrustedKey -PublicKey $cliKp.PublicKey -Json | ConvertFrom-Json
+    Assert (-not $cliInstall.AlreadyPresent) 'CLI InstallTrustedKey works'
+}
 
 Write-Host "=== Update check (network-dependent, non-fatal if it fails) ===" -ForegroundColor Cyan
 try {

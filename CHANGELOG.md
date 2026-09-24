@@ -4,6 +4,23 @@ All notable changes to SSH Toolkit are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] — 2026-09-23
+
+### Fixed
+- `Install-SshLinkTrustedKey` decided which file to write (`administrators_authorized_keys`
+  vs. per-user `authorized_keys`) by checking whether the CURRENT PROCESS was elevated
+  (`IsInRole(Administrator)`) — but that reflects this call's own token, not the account it's
+  running as. A background service (like AgenticBotPlatform itself) running unelevated as an
+  administrator ACCOUNT has a non-elevated token (Windows' UAC split-token behavior) even
+  though Windows sshd still only reads `administrators_authorized_keys` for that account's
+  login — so the key silently went into the file sshd never reads for it, and the "no error,
+  but it still doesn't work" failure this exact scenario surfaced live in real testing. Fixed
+  to check actual local-group membership (`Get-LocalGroupMember -Group Administrators`)
+  instead, matching what sshd itself keys off. This does mean an unelevated process now
+  correctly *fails* (with a clear access-denied error, not a silent wrong-file write) when
+  the account is an administrator — writing to `administrators_authorized_keys` genuinely
+  requires an elevated process; there's no way around that from here.
+
 ## [1.1.0] — 2026-09-23
 
 ### Added
