@@ -6,8 +6,9 @@
     call directly after `Import-Module SSHToolkit` from your own scripts - see README.md.
 
 .PARAMETER Action
-    List | Add | Edit | Remove | Connect | Test | TestAll | Visualize | InstallKey | Show |
-    GenerateLauncher | Copy | Export | Import | Update | CheckUpdate
+    List | Add | Edit | Remove | Connect | Test | TestAll | Visualize | InstallKey |
+    GenerateKeypair | InstallTrustedKey | Show | GenerateLauncher | Copy | Export | Import |
+    Update | CheckUpdate
     Omit this (and every other parameter) to get the interactive menu instead.
 
 .PARAMETER Name
@@ -60,6 +61,9 @@
 .PARAMETER FilePath
     With -Action Export/Import: the JSON file to write to / read from.
 
+.PARAMETER PublicKey
+    With -Action InstallTrustedKey: the raw OpenSSH public key text to trust.
+
 .EXAMPLE
     .\ssh-toolkit.ps1
 .EXAMPLE
@@ -76,8 +80,8 @@
 param(
     [Parameter(ParameterSetName = 'Scripted')]
     [ValidateSet('List', 'Add', 'Edit', 'Remove', 'Connect', 'Test', 'TestAll', 'Visualize',
-                 'InstallKey', 'Show', 'GenerateLauncher', 'Copy', 'Export', 'Import',
-                 'Update', 'CheckUpdate')]
+                 'InstallKey', 'GenerateKeypair', 'InstallTrustedKey', 'Show', 'GenerateLauncher',
+                 'Copy', 'Export', 'Import', 'Update', 'CheckUpdate')]
     [string]$Action,
 
     [Parameter(ParameterSetName = 'Scripted')] [string]$Name,
@@ -99,7 +103,8 @@ param(
     [Parameter(ParameterSetName = 'Scripted')] [string]$LocalPath,
     [Parameter(ParameterSetName = 'Scripted')] [string]$RemotePath,
     [Parameter(ParameterSetName = 'Scripted')] [switch]$ToRemote,
-    [Parameter(ParameterSetName = 'Scripted')] [string]$FilePath
+    [Parameter(ParameterSetName = 'Scripted')] [string]$FilePath,
+    [Parameter(ParameterSetName = 'Scripted')] [string]$PublicKey
 )
 
 $ErrorActionPreference = 'Stop'
@@ -325,6 +330,16 @@ switch ($Action) {
         if (-not $Name) { throw '-Action InstallKey needs -Name.' }
         $ok = Install-SshLinkPublicKey -Name $Name
         if (-not $ok) { exit 1 }
+    }
+    'GenerateKeypair' {
+        if (-not $Name) { throw '-Action GenerateKeypair needs -Name.' }
+        $result = New-SshLinkKeypair -Name $Name
+        if ($Json) { ConvertTo-Json -InputObject $result } else { $result }
+    }
+    'InstallTrustedKey' {
+        if (-not $PublicKey) { throw '-Action InstallTrustedKey needs -PublicKey.' }
+        $result = Install-SshLinkTrustedKey -PublicKey $PublicKey
+        if ($Json) { ConvertTo-Json -InputObject $result } else { $result }
     }
     'Show' {
         if (-not $Name) { throw '-Action Show needs -Name.' }

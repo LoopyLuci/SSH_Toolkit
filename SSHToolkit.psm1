@@ -386,6 +386,99 @@ function Install-SshLinkPublicKey {
     return $LASTEXITCODE -eq 0
 }
 
+function New-SshLinkKeypair {
+    <#
+    .SYNOPSIS
+        Generates (or reuses) an ed25519 keypair at ~/.ssh/id_ed25519_<Name>,
+        without registering a connection for it — for a caller (like
+        AgenticBotPlatform's peer-pairing handshake) that needs its own public
+        key to hand to the other side BEFORE it knows enough to register a full
+        connection (e.g. the username to log in as, which the other side hasn't
+        told it yet). Add-SshLinkConnection's own -GenerateKey does the same
+        keygen as part of registering a connection in one step; this is that
+        same keygen alone, for when the two need to happen at different times.
+        Idempotent: an existing key at that path is reused, never overwritten.
+    .EXAMPLE
+        New-SshLinkKeypair -Name peer-server
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Name)
+    if (-not (Test-Path $script:SshDir)) { New-Item -ItemType Directory -Path $script:SshDir -Force | Out-Null }
+    $identityFile = Join-Path $script:SshDir "id_ed25519_$Name"
+    $created = $false
+    if (-not (Test-Path $identityFile)) {
+        & ssh-keygen -t ed25519 -f $identityFile -N '""' -C "ssh-toolkit:$Name" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "ssh-keygen failed (exit $LASTEXITCODE)." }
+        $created = $true
+    }
+    $publicKey = (Get-Content -Path "$identityFile.pub" -Raw).Trim()
+    [pscustomobject]@{ IdentityFile = $identityFile; PublicKey = $publicKey; Created = $created }
+}
+
+function Install-SshLinkTrustedKey {
+    <#
+    .SYNOPSIS
+        Installs an already-received public key into THIS machine's own trusted
+        keys, so its owner can SSH in without a password — the inbound half of a
+        pairing. Install-SshLinkPublicKey above pushes a LOCAL key OUT to a
+        remote's authorized_keys via a real (interactive, password-prompting) SSH
+        session; this instead installs a key that arrived IN through some other
+        already-authenticated channel (e.g. AgenticBotPlatform's own peer-pairing
+        handshake, an HTTPS call gated by a one-time pairing token — see its
+        bot/peers.py) — no SSH session, no password prompt, safe to call
+        unattended. Idempotent: installing the same key twice is a no-op the
+        second time.
+    .EXAMPLE
+        Install-SshLinkTrustedKey -PublicKey 'ssh-ed25519 AAAA... peer@othermachine'
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$PublicKey)
+    $keyText = $PublicKey.Trim()
+    if (-not $keyText) { throw 'PublicKey is empty.' }
+    if ($keyText -notmatch '^(ssh-ed25519|ssh-rsa|ecdsa-sha2-\S+) \S+') {
+        throw "PublicKey doesn't look like an OpenSSH public key (expected 'ssh-ed25519 AAAA...' or similar)."
+    }
+
+    $isWindows = $env:OS -eq 'Windows_NT'
+    $isAdmin = $isWindows -and ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if ($isWindows -and $isAdmin) {
+        # Windows OpenSSH server: an administrator's own key must live here, not
+        # ~/.ssh/authorized_keys, or sshd silently ignores it.
+        $keyFile = Join-Path $env:ProgramData 'ssh\administrators_authorized_keys'
+    }
+    else {
+        $keyFile = Join-Path $script:SshDir 'authorized_keys'
+    }
+    $dir = Split-Path $keyFile -Parent
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    if (-not (Test-Path $keyFile)) { New-Item -ItemType File -Path $keyFile -Force | Out-Null }
+
+    $existing = @(Get-Content -Path $keyFile -ErrorAction SilentlyContinue)
+    $alreadyPresent = $existing -contains $keyText
+    if (-not $alreadyPresent) {
+        Add-Content -Path $keyFile -Value $keyText
+    }
+
+    if ($isWindows) {
+        # Windows sshd REJECTS an authorized_keys-style file outright if its ACLs
+        # are anything looser than exactly this — inherited/too-open permissions
+        # cause a silent "Permission denied" on every key in the file, admin or
+        # not. Re-applied every call (not just on first creation) since a prior
+        # manual edit could have reset the ACL.
+        if ($isAdmin) {
+            icacls $keyFile /inheritance:r /grant 'Administrators:F' /grant 'SYSTEM:F' | Out-Null
+        }
+        else {
+            icacls $keyFile /inheritance:r /grant "${env:USERNAME}:F" /grant 'SYSTEM:F' | Out-Null
+        }
+    }
+    else {
+        chmod 700 $dir
+        chmod 600 $keyFile
+    }
+    [pscustomobject]@{ KeyFile = $keyFile; AlreadyPresent = [bool]$alreadyPresent }
+}
+
 function Get-SshLinkStatus {
     <#
     .SYNOPSIS
@@ -623,7 +716,8 @@ Export-ModuleMember -Function @(
     'Initialize-SshLinkStore', 'Get-SshLinkConnections', 'Get-SshLinkConnection',
     'Add-SshLinkConnection', 'Set-SshLinkConnection', 'Remove-SshLinkConnection',
     'New-SshLinkLauncher', 'Connect-SshLink', 'Test-SshLinkConnection',
-    'Install-SshLinkPublicKey', 'Get-SshLinkStatus', 'Get-SshLinkStatusAll', 'Get-SshLinkGraph',
+    'Install-SshLinkPublicKey', 'New-SshLinkKeypair', 'Install-SshLinkTrustedKey',
+    'Get-SshLinkStatus', 'Get-SshLinkStatusAll', 'Get-SshLinkGraph',
     'Export-SshLinkConnections', 'Import-SshLinkConnections', 'Copy-SshLinkFile',
     'Get-SshConfigBlockText', 'Get-SshToolkitVersion', 'Test-SshToolkitUpdate', 'Update-SshToolkit'
 )

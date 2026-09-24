@@ -70,6 +70,30 @@ Write-Host "=== -Action Connect propagates a failed remote command's real exit c
 Assert ($LASTEXITCODE -ne 0) '-Action Connect exits non-zero when the underlying ssh call fails'
 & $cli -Action Remove -Name cli-test-connect -Force | Out-Null
 
+Write-Host "=== New-SshLinkKeypair / Install-SshLinkTrustedKey (ABP peer-pairing primitives) ===" -ForegroundColor Cyan
+$kp = New-SshLinkKeypair -Name pairtest
+Assert ($kp.Created) 'New-SshLinkKeypair generates a fresh keypair'
+Assert ($kp.PublicKey -like 'ssh-ed25519 *') 'New-SshLinkKeypair returns a real public key'
+$kp2 = New-SshLinkKeypair -Name pairtest
+Assert (-not $kp2.Created) 'New-SshLinkKeypair reuses an existing key instead of overwriting it'
+Assert ($kp2.PublicKey -eq $kp.PublicKey) 'the reused key is the same key'
+
+$install = Install-SshLinkTrustedKey -PublicKey $kp.PublicKey
+Assert (-not $install.AlreadyPresent) 'Install-SshLinkTrustedKey installs a new key'
+Assert ((Get-Content $install.KeyFile -Raw) -match [regex]::Escape($kp.PublicKey)) 'the key text is really in the file'
+$install2 = Install-SshLinkTrustedKey -PublicKey $kp.PublicKey
+Assert ($install2.AlreadyPresent) 'Install-SshLinkTrustedKey is idempotent — installing twice is a no-op'
+try {
+    Install-SshLinkTrustedKey -PublicKey 'not a real key'
+    Assert $false 'Install-SshLinkTrustedKey should reject text that is not an OpenSSH public key'
+}
+catch { Assert $true 'Install-SshLinkTrustedKey rejects malformed key text' }
+
+$cliKp = & $cli -Action GenerateKeypair -Name pairtest-cli -Json | ConvertFrom-Json
+Assert ($cliKp.Created) 'CLI GenerateKeypair works'
+$cliInstall = & $cli -Action InstallTrustedKey -PublicKey $cliKp.PublicKey -Json | ConvertFrom-Json
+Assert (-not $cliInstall.AlreadyPresent) 'CLI InstallTrustedKey works'
+
 Write-Host "=== Update check (network-dependent, non-fatal if it fails) ===" -ForegroundColor Cyan
 try {
     $check = Test-SshToolkitUpdate -Repo 'LoopyLuci/SSH_Toolkit'

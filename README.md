@@ -98,6 +98,8 @@ home unasked; every check is a single call you make when you choose to.
 | `Get-SshLinkStatus` / `Get-SshLinkStatusAll` | Reachability for one / every connection |
 | `Get-SshLinkGraph` | Every connection as a tree by proxy-jump chain, with live status — the data behind `-Action Visualize` |
 | `Install-SshLinkPublicKey` | Put a connection's public key on the remote (there's no `ssh-copy-id` on Windows) |
+| `New-SshLinkKeypair` | Generate (or reuse) a keypair without registering a connection for it yet |
+| `Install-SshLinkTrustedKey` | Trust an already-received public key locally — no SSH session, no password prompt |
 | `Copy-SshLinkFile` | `scp` wrapper, either direction |
 | `Export-SshLinkConnections` / `Import-SshLinkConnections` | Back up / restore the whole registry (key paths only, not key files) |
 | `New-SshLinkLauncher` | A standalone `Connect-<name>.ps1` that works without this toolkit at all |

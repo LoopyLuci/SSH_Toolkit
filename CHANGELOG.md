@@ -4,6 +4,25 @@ All notable changes to SSH Toolkit are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-09-23
+
+### Added
+- `New-SshLinkKeypair -Name <name>` — generates (or reuses) an ed25519 keypair at
+  `~/.ssh/id_ed25519_<name>` without registering a connection for it. Factored out of
+  `Add-SshLinkConnection -GenerateKey` for a caller that needs its own public key to hand
+  to the other side before it knows enough to register a full connection (e.g. the
+  username to log in as, which the other side hasn't said yet).
+- `Install-SshLinkTrustedKey -PublicKey <text>` — installs an already-received public key
+  into this machine's own trusted keys (the right file for an admin vs. a regular Windows
+  account, or `~/.ssh/authorized_keys` elsewhere), with the same ACL lock Windows sshd
+  requires. Unlike `Install-SshLinkPublicKey` (which pushes a local key OUT over a real,
+  password-prompting SSH session), this installs a key that arrived IN through some other
+  already-authenticated channel — no SSH session, no prompt, safe to call unattended.
+  Idempotent. Both are exposed through `bin/ssh-toolkit.ps1` as `-Action GenerateKeypair`
+  and `-Action InstallTrustedKey`. Built for AgenticBotPlatform's peer-pairing handshake
+  (`bot/peers.py`) to exchange and trust SSH keys automatically between two paired
+  machines, with no manual key copying.
+
 ## [1.0.5] — 2026-09-22
 
 ### Fixed

@@ -12,7 +12,7 @@
 RootModule = 'SSHToolkit.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.5'
+ModuleVersion = '1.1.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -73,7 +73,8 @@ FunctionsToExport = 'Initialize-SshLinkStore', 'Get-SshLinkConnections',
                'Get-SshLinkConnection', 'Add-SshLinkConnection', 
                'Set-SshLinkConnection', 'Remove-SshLinkConnection', 
                'New-SshLinkLauncher', 'Connect-SshLink', 'Test-SshLinkConnection', 
-               'Install-SshLinkPublicKey', 'Get-SshLinkStatus', 
+               'Install-SshLinkPublicKey', 'New-SshLinkKeypair', 'Install-SshLinkTrustedKey',
+               'Get-SshLinkStatus',
                'Get-SshLinkStatusAll', 'Get-SshLinkGraph', 
                'Export-SshLinkConnections', 'Import-SshLinkConnections', 
                'Copy-SshLinkFile', 'Get-SshConfigBlockText', 'Get-SshToolkitVersion', 
